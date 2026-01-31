@@ -1,7 +1,7 @@
 import React from 'react';
 import { useData } from '../context/DataContext';
 import { Division, Role, EventStatus } from '../types';
-import { User, Mail, Briefcase, Calendar, MapPin, Clock, Shield } from 'lucide-react';
+import { Briefcase, Calendar, MapPin, Clock, Shield } from 'lucide-react';
 
 export const Profile: React.FC = () => {
   const { currentUser, events, updateUserProfile } = useData();

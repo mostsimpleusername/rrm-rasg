@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { Role, Division, User } from '../types';
-import { CheckCircle2, XCircle, Search, Filter, Eye, X, Calendar, Clock, MapPin, AlertCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, Search, Filter, Eye, X, Calendar, Clock, AlertCircle } from 'lucide-react';
 
 export const Members: React.FC = () => {
   const { users, events, updateUserStatus, currentUser } = useData();
