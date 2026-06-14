@@ -28,9 +28,9 @@ RRM-RASG is a modern, responsive web application designed to manage volunteers (
 ## 📁 Project Structure & Documentation
 
 This repository contains academic documentation for System Analysis classes located in the `/.apsi-laporan` directory:
-- [01. Product Requirements Document (PRD)](.apsi-laporan/all-prd.md)
-- [02. UML Diagrams (Use Case)](.apsi-laporan/uml.md)
-- [03. User Flows & Sequence Diagrams](.apsi-laporan/userflow.md)
+- [01. System Analysis & Product Requirement Document (PRD)](.apsi-laporan/PRD-Readme.md)  *(Full Comprehensive Document)*
+- [02. UML Use Case Diagram](.apsi-laporan/uml.md)
+- [03. User Flow & Sequence Diagram](.apsi-laporan/userflow.md)
 - [04. Activity Diagrams](.apsi-laporan/activity-dia.md)
 - [05. Database Architecture & ERD](.apsi-laporan/erd.md)
 - [06. Tech Stack & Security Infrastructure](.apsi-laporan/infrastructure.md)
