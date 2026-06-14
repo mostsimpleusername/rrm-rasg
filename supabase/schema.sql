@@ -145,6 +145,21 @@ CREATE POLICY "profiles: super_admin can update any"
     (SELECT role FROM profiles WHERE id = auth.uid()) = 'super_admin'
   );
 
+-- Division admins may update profiles in their own division
+CREATE POLICY "profiles: division_admin can update own division"
+  ON profiles FOR UPDATE
+  TO authenticated
+  USING (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'division_admin'
+    AND division = (SELECT division FROM profiles WHERE id = auth.uid())
+    AND role != 'super_admin'
+  )
+  WITH CHECK (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'division_admin'
+    AND division = (SELECT division FROM profiles WHERE id = auth.uid())
+    AND role != 'super_admin'
+  );
+
 -- ---- events -----------------------------------------------------------------
 
 -- Any authenticated user may read all events
@@ -153,24 +168,44 @@ CREATE POLICY "events: authenticated can read"
   TO authenticated
   USING (true);
 
--- Only admins may create events
+-- Only admins may create events (Division Admins can only insert for their division)
 CREATE POLICY "events: admins can insert"
   ON events FOR INSERT
   TO authenticated
-  WITH CHECK (is_admin());
+  WITH CHECK (
+    is_admin() AND (
+      (SELECT role FROM profiles WHERE id = auth.uid()) = 'super_admin' OR
+      division = (SELECT division FROM profiles WHERE id = auth.uid())
+    )
+  );
 
 -- Only admins may update events
 CREATE POLICY "events: admins can update"
   ON events FOR UPDATE
   TO authenticated
-  USING  (is_admin())
-  WITH CHECK (is_admin());
+  USING (
+    is_admin() AND (
+      (SELECT role FROM profiles WHERE id = auth.uid()) = 'super_admin' OR
+      division = (SELECT division FROM profiles WHERE id = auth.uid())
+    )
+  )
+  WITH CHECK (
+    is_admin() AND (
+      (SELECT role FROM profiles WHERE id = auth.uid()) = 'super_admin' OR
+      division = (SELECT division FROM profiles WHERE id = auth.uid())
+    )
+  );
 
 -- Only admins may delete events
 CREATE POLICY "events: admins can delete"
   ON events FOR DELETE
   TO authenticated
-  USING (is_admin());
+  USING (
+    is_admin() AND (
+      (SELECT role FROM profiles WHERE id = auth.uid()) = 'super_admin' OR
+      division = (SELECT division FROM profiles WHERE id = auth.uid())
+    )
+  );
 
 -- ---- event_attendees --------------------------------------------------------
 

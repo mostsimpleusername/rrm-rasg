@@ -4,16 +4,23 @@ import { Role, Division, User } from '../types';
 import { CheckCircle2, XCircle, Search, Filter, Eye, X, Calendar, Clock, AlertCircle } from 'lucide-react';
 
 export const Members: React.FC = () => {
-  const { users, events, updateUserStatus, currentUser } = useData();
+  const { users, events, updateUserStatus, updateUserProfile, currentUser } = useData();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [filterDivision, setFilterDivision] = React.useState<string>('Semua');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [userToApprove, setUserToApprove] = useState<User | null>(null);
+  const [actionUser, setActionUser] = useState<{ user: User, action: 'Nonaktifkan' | 'Tolak' } | null>(null);
+  const [profileUpdates, setProfileUpdates] = useState<{ role?: Role, division?: Division } | null>(null);
+  const [confirmProfileUpdate, setConfirmProfileUpdate] = useState<boolean>(false);
 
   if (currentUser?.role === Role.MEMBER) {
     return <div className="text-center p-10 text-slate-500">Akses Ditolak. Area khusus admin.</div>;
   }
 
   const filteredUsers = users.filter(user => {
+    if (currentUser?.role === Role.DIVISION_ADMIN && user.division !== currentUser.division) {
+      return false;
+    }
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           user.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDivision = filterDivision === 'Semua' || user.division === filterDivision;
@@ -137,7 +144,10 @@ export const Members: React.FC = () => {
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end space-x-2">
                       <button
-                        onClick={() => setSelectedUser(user)}
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setProfileUpdates({ role: user.role, division: user.division });
+                        }}
                         className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                         title="Lihat Detail"
                       >
@@ -146,14 +156,14 @@ export const Members: React.FC = () => {
                       {user.status === 'Menunggu' && (
                         <>
                           <button
-                            onClick={() => updateUserStatus(user.id, 'Aktif')}
+                            onClick={() => setUserToApprove(user)}
                             className="p-1 text-green-600 hover:bg-green-50 rounded"
                             title="Setujui"
                           >
                             <CheckCircle2 size={20} />
                           </button>
                           <button
-                            onClick={() => updateUserStatus(user.id, 'Nonaktif')}
+                            onClick={() => setActionUser({ user, action: 'Tolak' })}
                             className="p-1 text-red-600 hover:bg-red-50 rounded"
                             title="Tolak"
                           >
@@ -163,7 +173,7 @@ export const Members: React.FC = () => {
                       )}
                       {user.status === 'Aktif' && user.id !== currentUser?.id && (
                          <button
-                         onClick={() => updateUserStatus(user.id, 'Nonaktif')}
+                         onClick={() => setActionUser({ user, action: 'Nonaktifkan' })}
                          className="p-1 text-red-600 hover:bg-red-50 rounded"
                          title="Nonaktifkan"
                        >
@@ -185,6 +195,80 @@ export const Members: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Approval Confirmation Modal */}
+      {userToApprove && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                <CheckCircle2 size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">Setujui Anggota</h3>
+            </div>
+            <p className="text-slate-500 mb-4 text-sm">
+              Anda akan menyetujui akun <strong>{userToApprove.name}</strong>. Anda dapat menyesuaikan atribut di bawah ini sebelum menyetujui.
+            </p>
+            <div className="space-y-4 mb-6 text-left">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Divisi</label>
+                {currentUser?.role === Role.SUPER_ADMIN ? (
+                  <select
+                    value={userToApprove.division}
+                    onChange={(e) => setUserToApprove({ ...userToApprove, division: e.target.value as Division })}
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                  >
+                    {Object.values(Division).map((div) => (
+                      <option key={div} value={div}>{div}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="w-full px-3 py-2 text-sm border border-slate-200 bg-slate-50 rounded text-slate-700 font-medium">
+                    {userToApprove.division}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Peran</label>
+                <select
+                  value={userToApprove.role}
+                  onChange={(e) => setUserToApprove({ ...userToApprove, role: e.target.value as Role })}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                >
+                  {Object.values(Role).map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button 
+                onClick={() => setUserToApprove(null)}
+                className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium text-sm"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={async () => {
+                  try {
+                    await updateUserProfile(userToApprove.id, { 
+                      division: userToApprove.division, 
+                      role: userToApprove.role 
+                    });
+                    await updateUserStatus(userToApprove.id, 'Aktif');
+                    setUserToApprove(null);
+                  } catch (err) {
+                    console.error("Failed to approve", err);
+                  }
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm"
+              >
+                Setujui & Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Member Detail Modal */}
       {selectedUser && (
@@ -212,11 +296,31 @@ export const Members: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <div className="p-4 bg-slate-50 rounded-lg">
                   <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Divisi</p>
-                  <p className="font-medium text-slate-900">{selectedUser.division}</p>
+                  {currentUser?.role === Role.SUPER_ADMIN ? (
+                    <select
+                      value={profileUpdates?.division || selectedUser.division}
+                      onChange={(e) => setProfileUpdates({ ...profileUpdates, division: e.target.value as Division })}
+                      className="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                    >
+                      {Object.values(Division).map((div) => (
+                        <option key={div} value={div}>{div}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="font-medium text-slate-900">{selectedUser.division}</p>
+                  )}
                 </div>
                 <div className="p-4 bg-slate-50 rounded-lg">
                   <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Peran</p>
-                  <p className="font-medium text-slate-900">{selectedUser.role}</p>
+                  <select
+                    value={profileUpdates?.role || selectedUser.role}
+                    onChange={(e) => setProfileUpdates({ ...profileUpdates, role: e.target.value as Role })}
+                    className="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                  >
+                    {Object.values(Role).map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="p-4 bg-slate-50 rounded-lg">
                   <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Status</p>
@@ -266,7 +370,77 @@ export const Members: React.FC = () => {
                       </div>
                    )}
                 </div>
+
+                {profileUpdates && (profileUpdates.role !== selectedUser.role || profileUpdates.division !== selectedUser.division) && (
+                  <div className="mt-6 flex justify-end">
+                    <button 
+                      onClick={() => setConfirmProfileUpdate(true)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm transition-colors"
+                    >
+                      Simpan Perubahan
+                    </button>
+                  </div>
+                )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Action (Reject/Deactivate) Modal */}
+      {actionUser && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl border-t-4 border-red-500">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Konfirmasi Aksi</h3>
+            <p className="text-slate-500 text-sm mb-6">
+              Apakah Anda yakin ingin <strong>{actionUser.action.toLowerCase()}</strong> akun <strong>{actionUser.user.name}</strong>?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button 
+                onClick={() => setActionUser(null)}
+                className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium text-sm"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={async () => {
+                  await updateUserStatus(actionUser.user.id, 'Nonaktif');
+                  setActionUser(null);
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm"
+              >
+                Ya, {actionUser.action}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Profile Update Modal */}
+      {confirmProfileUpdate && selectedUser && profileUpdates && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Simpan Perubahan</h3>
+            <p className="text-slate-500 text-sm mb-6">
+              Apakah Anda yakin ingin menyimpan perubahan profil untuk <strong>{selectedUser.name}</strong>?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button 
+                onClick={() => setConfirmProfileUpdate(false)}
+                className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium text-sm"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={async () => {
+                  await updateUserProfile(selectedUser.id, profileUpdates);
+                  setSelectedUser({ ...selectedUser, ...profileUpdates });
+                  setConfirmProfileUpdate(false);
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm"
+              >
+                Ya, Simpan
+              </button>
             </div>
           </div>
         </div>

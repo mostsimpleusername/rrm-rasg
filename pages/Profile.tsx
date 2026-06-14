@@ -1,15 +1,12 @@
 import React from 'react';
 import { useData } from '../context/DataContext';
-import { Division, Role, EventStatus } from '../types';
+import { EventStatus } from '../types';
 import { Briefcase, Calendar, MapPin, Clock, Shield } from 'lucide-react';
 
 export const Profile: React.FC = () => {
-  const { currentUser, events, updateUserProfile } = useData();
+  const { currentUser, events } = useData();
 
   if (!currentUser) return null;
-
-  const isAdmin = currentUser.role === Role.SUPER_ADMIN || currentUser.role === Role.DIVISION_ADMIN;
-  
   const userEvents = events.filter(event => event.attendees.includes(currentUser.id));
   
   // Sort events: upcoming first, then others
@@ -19,9 +16,6 @@ export const Profile: React.FC = () => {
      return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
 
-  const handleDivisionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    updateUserProfile(currentUser.id, { division: e.target.value as Division });
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -78,19 +72,7 @@ export const Profile: React.FC = () => {
                 </div>
                 <div className="flex-1">
                   <p className="text-xs text-slate-400 font-medium uppercase">Divisi</p>
-                  {isAdmin ? (
-                    <select
-                      value={currentUser.division}
-                      onChange={handleDivisionChange}
-                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                    >
-                      {Object.values(Division).map((div) => (
-                        <option key={div} value={div}>{div}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <p className="text-sm font-medium text-slate-900">{currentUser.division}</p>
-                  )}
+                  <p className="text-sm font-medium text-slate-900">{currentUser.division}</p>
                 </div>
               </div>
 

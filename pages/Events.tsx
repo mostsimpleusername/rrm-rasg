@@ -5,10 +5,19 @@ import { CalendarPlus, MapPin, Calendar, Clock, Sparkles, Trash2, Edit2, Users }
 import { generateEventDescription } from '../services/geminiService';
 
 export const Events: React.FC = () => {
-  const { events, currentUser, addEvent, updateEvent, deleteEvent, registerForEvent } = useData();
+  
+  const { events, currentUser, addEvent, updateEvent, deleteEvent, registerForEvent, users } = useData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
+
+  const [eventToCancel, setEventToCancel] = useState<Event | null>(null);
+  const [cancelConfirmationName, setCancelConfirmationName] = useState('');
+  const [eventToAddAttendees, setEventToAddAttendees] = useState<Event | null>(null);
+  const [eventToJoin, setEventToJoin] = useState<Event | null>(null);
+  const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
+  const [deleteConfirmationName, setDeleteConfirmationName] = useState('');
+
 
   // Form State
   const [title, setTitle] = useState('');
@@ -20,6 +29,18 @@ export const Events: React.FC = () => {
   const [status, setStatus] = useState<EventStatus>(EventStatus.UPCOMING);
 
   const isAdmin = currentUser?.role === Role.SUPER_ADMIN || currentUser?.role === Role.DIVISION_ADMIN;
+
+  const getComputedStatus = (event: Event): EventStatus => {
+    if (event.status === EventStatus.CANCELLED) return EventStatus.CANCELLED;
+    const eventDateTime = new Date(`${event.date}T${event.time}`);
+    const now = new Date();
+    const eventEnd = new Date(eventDateTime.getTime() + 3 * 60 * 60 * 1000);
+    
+    if (now < eventDateTime) return EventStatus.UPCOMING;
+    if (now >= eventDateTime && now <= eventEnd) return EventStatus.ONGOING;
+    return EventStatus.COMPLETED;
+  };
+
 
   const handleGenerateDescription = async () => {
     if (!title || !location) {
@@ -78,16 +99,18 @@ export const Events: React.FC = () => {
   };
 
 
+  
   const resetForm = () => {
     setTitle('');
     setDescription('');
     setDate('');
     setTime('');
     setLocation('');
-    setDivision(Division.GENERAL);
+    setDivision(currentUser?.role === Role.DIVISION_ADMIN ? currentUser.division : Division.GENERAL);
     setStatus(EventStatus.UPCOMING);
     setEditingEventId(null);
   };
+
 
   const getStatusColor = (status: EventStatus) => {
     switch (status) {
@@ -124,8 +147,8 @@ export const Events: React.FC = () => {
           <div key={event.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
-                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusColor(event.status)}`}>
-                  {event.status}
+                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusColor(getComputedStatus(event))}`}>
+                  {getComputedStatus(event)}
                 </span>
                 <span className="text-xs font-medium text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100">
                   {event.division}
@@ -157,8 +180,16 @@ export const Events: React.FC = () => {
                 </div>
                 
                 <div className="flex gap-2">
-                  {isAdmin ? (
+                  
+                  {isAdmin && (currentUser?.role === Role.SUPER_ADMIN || event.division === currentUser?.division) ? (
                     <>
+                      <button 
+                        onClick={() => setEventToAddAttendees(event)}
+                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                        title="Tambah Peserta"
+                      >
+                        <Users size={18} />
+                      </button>
                       <button 
                         onClick={() => handleEdit(event)}
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -167,17 +198,25 @@ export const Events: React.FC = () => {
                         <Edit2 size={18} />
                       </button>
                       <button 
-                        onClick={() => deleteEvent(event.id)}
+                        onClick={() => setEventToCancel(event)}
+                        className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                        title="Batalkan Kegiatan"
+                      >
+                        <Trash2 size={18} /> {/* Actually maybe use a different icon but Trash2 is fine or XCircle */}
+                      </button>
+                      <button 
+                        onClick={() => setEventToDelete(event)}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Hapus"
+                        title="Hapus Permanen"
                       >
                         <Trash2 size={18} />
                       </button>
                     </>
-                  ) : (
+                  ) : !isAdmin ? (
+
                     <button 
-                      onClick={() => registerForEvent(event.id)}
-                      disabled={event.attendees.includes(currentUser?.id || '') || event.status !== EventStatus.UPCOMING}
+                      onClick={() => setEventToJoin(event)}
+                      disabled={event.attendees.includes(currentUser?.id || '') || getComputedStatus(event) !== EventStatus.UPCOMING}
                       className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                         event.attendees.includes(currentUser?.id || '')
                           ? 'bg-green-50 text-green-700'
@@ -186,7 +225,7 @@ export const Events: React.FC = () => {
                     >
                       {event.attendees.includes(currentUser?.id || '') ? 'Terdaftar' : 'Gabung'}
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -251,32 +290,29 @@ export const Events: React.FC = () => {
                     placeholder="Ruang 101"
                   />
                 </div>
+                 
                  <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Divisi</label>
-                  <select
-                    value={division}
-                    onChange={(e) => setDivision(e.target.value as Division)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                  >
-                    {Object.values(Division).map(div => (
+                  {currentUser?.role === Role.SUPER_ADMIN ? (
+                    <select
+                      value={division}
+                      onChange={(e) => setDivision(e.target.value as Division)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                    >
+                      {Object.values(Division).filter(div => div !== Division.GENERAL).map(div => (
                       <option key={div} value={div}>{div}</option>
                     ))}
-                  </select>
+                    </select>
+                  ) : (
+                    <div className="w-full px-3 py-2 border border-slate-200 bg-slate-50 rounded-lg text-slate-700">
+                      {division}
+                    </div>
+                  )}
                 </div>
+
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as EventStatus)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                >
-                  {Object.values(EventStatus).map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
+              
 
               <div>
                 <div className="flex justify-between items-center mb-1">
@@ -319,6 +355,156 @@ export const Events: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Cancel Event Modal */}
+      {eventToCancel && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Batalkan Kegiatan</h3>
+            <p className="text-slate-500 text-sm mb-4">
+              Ketik <strong>{eventToCancel.title}</strong> untuk mengonfirmasi pembatalan kegiatan ini.
+            </p>
+            <input
+              type="text"
+              value={cancelConfirmationName}
+              onChange={(e) => setCancelConfirmationName(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none mb-6"
+              placeholder="Ketik nama kegiatan..."
+            />
+            <div className="flex gap-3 justify-end">
+              <button 
+                onClick={() => {
+                  setEventToCancel(null);
+                  setCancelConfirmationName('');
+                }}
+                className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium text-sm"
+              >
+                Batal
+              </button>
+              <button 
+                disabled={cancelConfirmationName !== eventToCancel.title}
+                onClick={async () => {
+                  await updateEvent({ ...eventToCancel, status: EventStatus.CANCELLED });
+                  setEventToCancel(null);
+                  setCancelConfirmationName('');
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Batalkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Attendees Modal */}
+      {eventToAddAttendees && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl max-w-md w-full max-h-[80vh] flex flex-col shadow-2xl">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-slate-900">Tambah Peserta</h3>
+              <button onClick={() => setEventToAddAttendees(null)} className="text-slate-400 hover:text-slate-600">×</button>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="space-y-2">
+                {users
+                  .filter(u => u.status === 'Aktif' && !eventToAddAttendees.attendees.includes(u.id))
+                  .filter(u => currentUser?.role === Role.SUPER_ADMIN || u.division === currentUser?.division)
+                  .map(user => (
+                    <div key={user.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-lg hover:border-blue-100">
+                      <div>
+                        <p className="font-medium text-sm text-slate-900">{user.name}</p>
+                        <p className="text-xs text-slate-500">{user.division}</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          const newEvent = { ...eventToAddAttendees, attendees: [...eventToAddAttendees.attendees, user.id] };
+                          await updateEvent(newEvent);
+                          setEventToAddAttendees(newEvent);
+                        }}
+                        className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded"
+                      >
+                        Tambah
+                      </button>
+                    </div>
+                ))}
+                {users.filter(u => u.status === 'Aktif' && !eventToAddAttendees.attendees.includes(u.id)).filter(u => currentUser?.role === Role.SUPER_ADMIN || u.division === currentUser?.division).length === 0 && (
+                  <p className="text-center text-slate-500 text-sm">Semua anggota yang tersedia sudah terdaftar.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Join Event Modal */}
+      {eventToJoin && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Gabung Kegiatan</h3>
+            <p className="text-slate-500 text-sm mb-6">
+              Apakah Anda yakin ingin bergabung dengan kegiatan <strong>{eventToJoin.title}</strong>?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button 
+                onClick={() => setEventToJoin(null)}
+                className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium text-sm"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={async () => {
+                  await registerForEvent(eventToJoin.id);
+                  setEventToJoin(null);
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm"
+              >
+                Ya, Gabung
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Event Modal */}
+      {eventToDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl border-t-4 border-red-500">
+            <h3 className="text-lg font-bold text-red-600 mb-2">Hapus Permanen Kegiatan</h3>
+            <p className="text-slate-500 text-sm mb-4">
+              Tindakan ini tidak dapat dibatalkan. Ketik <strong>{eventToDelete.title}</strong> untuk mengonfirmasi penghapusan permanen.
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmationName}
+              onChange={(e) => setDeleteConfirmationName(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none mb-6"
+              placeholder="Ketik nama kegiatan..."
+            />
+            <div className="flex gap-3 justify-end">
+              <button 
+                onClick={() => {
+                  setEventToDelete(null);
+                  setDeleteConfirmationName('');
+                }}
+                className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium text-sm"
+              >
+                Batal
+              </button>
+              <button 
+                disabled={deleteConfirmationName !== eventToDelete.title}
+                onClick={async () => {
+                  await deleteEvent(eventToDelete.id);
+                  setEventToDelete(null);
+                  setDeleteConfirmationName('');
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Hapus Permanen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

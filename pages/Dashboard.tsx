@@ -5,7 +5,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Users, Calendar, TrendingUp, Award, Clock, MapPin, CheckCircle2 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
-  const { users, events, currentUser, registerForEvent } = useData();
+  const { users: allUsers, events, currentUser, registerForEvent } = useData();
+
+  // Exclude 'Umum' division from dashboard metrics
+  const users = allUsers.filter(u => u.division !== Division.GENERAL);
 
   const totalMembers = users.length;
   const activeMembers = users.filter(u => u.status === 'Aktif').length;
@@ -13,16 +16,22 @@ export const Dashboard: React.FC = () => {
   
   // Calculate attendance rate (mock calculation)
   const totalPossibleAttendance = events.length * users.length; // Simplified
-  const actualAttendance = events.reduce((acc, curr) => acc + curr.attendees.length, 0);
+  const actualAttendance = events.reduce((acc, curr) => {
+    const validAttendees = curr.attendees.filter(id => users.some(u => u.id === id));
+    return acc + validAttendees.length;
+  }, 0);
+  
   const attendanceRate = totalPossibleAttendance > 0 
     ? Math.round((actualAttendance / totalPossibleAttendance) * 100) 
     : 0;
 
   // Prepare data for charts
-  const divisionData = Object.values(Division).map(div => ({
-    name: div,
-    count: users.filter(u => u.division === div).length
-  }));
+  const divisionData = Object.values(Division)
+    .filter(div => div !== Division.GENERAL)
+    .map(div => ({
+      name: div,
+      count: users.filter(u => u.division === div).length
+    }));
 
   const eventStatusData = [
     { name: 'Akan Datang', value: events.filter(e => e.status === 'Akan Datang').length },
