@@ -1,6 +1,13 @@
 # Rumah Amal Salman Garut (RRM-RASG) - Volunteer & Event Management System
 
-![Dashboard Preview](https://via.placeholder.com/1200x600.png?text=RRM-RASG+Dashboard)
+![Dashboard Preview](dashboard-preview.png)
+
+> [!TIP]
+> **Cara Menampilkan/Memperbaiki Preview Dashboard:**
+> 1. Jalankan proyek secara lokal (`npm run dev`) atau buka aplikasi Anda yang sudah di-deploy.
+> 2. Ambil tangkapan layar (*screenshot*) dari halaman dashboard utama.
+> 3. Simpan gambar tersebut dengan nama **`dashboard-preview.png`** di **direktori utama (root)** repositori ini.
+> 4. Lakukan `git commit` dan `git push` gambar tersebut ke GitHub untuk menggantikan placeholder ini dengan preview dashboard Anda sendiri.
 
 RRM-RASG is a modern, responsive web application designed to manage volunteers (members) and organizational events across multiple divisions. Built with performance and granular security in mind, the platform provides a unified dashboard for system administrators, division leads, and general members.
 
@@ -10,12 +17,19 @@ RRM-RASG is a modern, responsive web application designed to manage volunteers (
   - **Super Admins**: Total oversight. Can manage all users, transfer members between divisions, and oversee all events.
   - **Division Admins**: Granular access restricted exclusively to their assigned division. They can approve/reject members and create/cancel events strictly within their operational boundary.
   - **Members**: Can view available events, join them, and view their personal attendance dashboard.
+- **Interactive UX Feedbacks & Toast Notifications**
+  - Custom global Toast notification system for instant CRUD action feedback.
+  - Real-time loading indicator spinners and disabled states on buttons during database operations to ensure smooth and double-submit-proof interactions.
+- **Granular Event Visibility**
+  - Division admins can set events to be accessible to "Semua Divisi" (All Divisions) or restrict them to their specific division.
+  - Members only see events targeted to all divisions or their own specific division on their dashboard.
 - **Dynamic Event Status Automation**
   - Event statuses (`Upcoming`, `Ongoing`, `Completed`) are calculated in real-time based on the current date and time, eliminating manual overhead.
 - **AI-Powered Event Generation**
   - Integrated with **Google Gemini AI** to automatically generate engaging, professional event descriptions based on a title and division context.
 - **Bulletproof Database Security**
   - Uses PostgreSQL **Row Level Security (RLS)** ensuring that API boundaries cannot be bypassed. A division admin physically cannot update a row belonging to another division.
+
 
 ## 🛠 Tech Stack
 

@@ -1,169 +1,110 @@
-# Rumah Amal Salman — Prototype
+# Rumah Amal Salman — Production Deployment
 
-This repository contains a frontend prototype for a Human Resource & Event Management system. It's intentionally frontend-first: the UI, pages and flows are implemented with mock data and localStorage to validate UX and component design before building a production backend.
-
-This README explains:
-- System architecture and how the prototype maps to the production system
-- Recommended tech stack for the real project
-- Database schema (Prisma-ready summary)
-- Planned API endpoints
-- Local development and deployment notes
-- Roadmap and next steps to move from prototype → production
+![Dashboard Preview](dashboard-preview.png)
+This repository contains the production version of the Human Resource & Event Management system, fully integrated with a Supabase PostgreSQL backend and Google Gemini AI.
 
 ---
 
-## Goals
+## 🌟 Goals
 
-- Validate UI and user flows for authentication, member management, event management and admin dashboards.
-- Provide reusable React components and visual patterns to accelerate the full project.
-- Produce a clear migration plan: replace prototype data layer with an Express + Prisma backend and PostgreSQL.
+- Manage volunteer profiles, event CRUD operations, and attendance securely in production.
+- Enforce Role-Based Access Control (RBAC) securely at the database level using Supabase Row Level Security (RLS) policies.
+- Automate event statuses and AI description generation.
 
-## System Architecture (prototype → production)
+## 🛠 System Architecture
 
-- Frontend (prototype): React + Vite + Tailwind — presents UI, uses `DataContext` with mock data and localStorage for session simulation.
-- Frontend (production): same UI stack — replace `DataContext` with an API client + auth store (Zustand or Context + secure token storage).
-- Backend (production): Node.js + Express providing REST endpoints for auth, users, events, attendance. JWT + bcrypt for auth.
-- Database (production): PostgreSQL managed with Prisma ORM and migrations.
+- **Frontend**: React 18, Vite, TypeScript, Tailwind CSS, Lucide React (Icons), and Recharts (Charts).
+- **Backend/BaaS**: Supabase
+  - **Authentication**: Supabase GoTrue Auth (email/password signup & login).
+  - **Database**: PostgreSQL with custom functions and triggers to automatically sync user profiles upon authentication signup.
+  - **Security**: Row Level Security (RLS) policies to protect data boundaries at the API level (preventing unauthorized read/write access).
+- **AI Integration**: Google Gemini AI API (`@google/genai`) for automatic description generation.
 
-Mapping prototype pieces to production code:
-- `DataContext` → `client/services/api.ts` + token-based auth flows
-- UI pages/components → reused with API-backed data
-- Charts/visualizations → same components, fed by API metrics
+---
 
-## Tech Stack (recommended)
+## 📁 Database Schema (Supabase PostgreSQL)
 
-Frontend
-- React 18 (Vite)
-- Tailwind CSS + shadcn/ui (optional)
-- React Router
-- React Hook Form + Zod
-- Axios for API calls
-- Zustand for small global state (optional)
+### 1. Enums
+- `role`: `'super_admin'`, `'division_admin'`, `'member'`
+- `division`: `'HR'`, `'Lingkungan'`, `'Media'`, `'Ristek'`, `'Kesehatan'`, `'Pendidikan'`
+- `user_status`: `'Aktif'`, `'Nonaktif'`, `'Menunggu'`
+- `event_status`: `'Upcoming'`, `'Ongoing'`, `'Completed'`, `'Cancelled'`
 
-Backend
-- Node.js + Express
-- PostgreSQL
-- Prisma ORM
-- JWT authentication + bcrypt
-- express-validator for request validation
+### 2. Tables
 
-Dev / Infra
-- Git, GitHub
-- Vercel for frontend, Railway/Render for backend
-- Postman / Thunder Client for API testing
+#### `profiles`
+Tracks user details and syncs with Supabase Auth:
+- `id` (UUID, primary key, references `auth.users`)
+- `name` (text, non-null)
+- `email` (text, non-null)
+- `role` (role enum, default `'member'`)
+- `division` (division enum, default `'HR'`)
+- `status` (user_status enum, default `'Menunggu'`)
+- `created_at` / `updated_at` (timestamps)
 
-## Database Schema (summary, Prisma-ready)
+#### `events`
+Tracks organizational events:
+- `id` (UUID, primary key)
+- `name` (text)
+- `description` (text)
+- `event_date` (timestamp with time zone)
+- `location` (text)
+- `status` (event_status enum, automated or manual)
+- `organizer_division` (division enum)
+- `max_participants` (integer)
+- `target_division` (division enum, nullable - NULL indicates open to all divisions)
+- `created_by` (UUID, references `profiles.id`)
+- `created_at` / `updated_at` (timestamps)
 
-Enums:
-- Division: HR, Lingkungan, Media, Ristek, Kesehatan, Pendidikan
-- Role: super_admin, division_admin, member
-- UserStatus: active, inactive, pending
-- EventStatus: upcoming, ongoing, completed, cancelled
-- AttendanceStatus: registered, attended, absent
+#### `event_registrations`
+Tracks members registering for events:
+- `id` (UUID, primary key)
+- `event_id` (UUID, references `events.id` with cascade delete)
+- `user_id` (UUID, references `profiles.id` with cascade delete)
+- `registered_at` (timestamp with time zone)
 
-Models (summary):
-- User: id (UUID), name, email, password (hashed in production), division, role, status, createdAt, updatedAt
-- Event: id (UUID), name, description, eventDate, location, organizerDivision, status, maxParticipants, createdById, createdAt, updatedAt
-- Attendance: id (UUID), eventId, userId, attendanceStatus, registeredAt, attendedAt
+---
 
-These models support role-based user management, event CRUD, attendance tracking and reporting.
+## 🔒 Row Level Security (RLS) Policies
 
-## Planned API Endpoints
+To secure the production database, the following PostgreSQL RLS rules are configured:
 
-Auth
-- POST /api/auth/register — register (status pending)
-- POST /api/auth/login — returns JWT
-- POST /api/auth/logout — client clears token
-- GET /api/auth/me — current user
+1. **Profiles**:
+   - Users can read all profiles in their same division (or all profiles if they are super_admin).
+   - Only super_admin and division_admin (within their division) can update user profiles (e.g., status approval, roles, division changes).
+2. **Events**:
+   - Anyone authenticated can read events.
+   - Only super_admin and division_admin can insert, update, or delete events.
+3. **Event Registrations**:
+   - Members can insert/delete their own registration rows.
+   - Admins can read all registrations to view event attendance.
 
-Users (admin-protected)
-- GET /api/users
-- GET /api/users/:id
-- PUT /api/users/:id
-- DELETE /api/users/:id
-- PATCH /api/users/:id/approve
+---
 
-Events
-- GET /api/events
-- GET /api/events/:id
-- POST /api/events (admin)
-- PUT /api/events/:id (admin)
-- DELETE /api/events/:id (admin)
-- PATCH /api/events/:id/status (admin)
+## 🚀 Production Deployment Setup
 
-Attendance
-- POST /api/attendance/register
-- DELETE /api/attendance/:id
-- GET /api/attendance/my-events
-- PATCH /api/attendance/:id/mark (admin)
+### 1. Supabase Project Setup
+1. Create a project at [supabase.com](https://supabase.com).
+2. Go to the SQL Editor and execute `supabase/schema.sql`. This sets up:
+   - All custom tables, enums, triggers, and functions.
+   - The trigger `on_auth_user_created` which automatically creates a profile row in the `profiles` table when a user registers via Supabase Auth.
+   - All necessary RLS policies.
+3. (Optional) Run `supabase/seed_dummy.sql` if you want pre-populated dummy events and member records for staging.
 
-Standard response format (recommended):
-```json
-{ "success": true|false, "message": "...", "data": {...} }
+### 2. Environmental Variables Configuration
+Configure your production build environment (e.g., Vercel, Netlify, Render) with the following environment variables:
+
+```env
+VITE_SUPABASE_URL=https://your-supabase-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key-here
+VITE_GEMINI_API_KEY=your-gemini-api-key-here
 ```
 
-## Local development (prototype)
+*Note: For Vite, these variables must be prefixed with `VITE_` to be bundled into the production static files.*
 
-Install and run the UI prototype:
-
-```powershell
-npm install
-npm run dev
-```
-
-Build:
-
-```powershell
+### 3. Build and Deploy Frontend
+Build command:
+```bash
 npm run build
-npm run preview
 ```
-
-Notes: the prototype uses mock data and localStorage. Migrating to real backend requires creating `client/services/api.ts` and replacing `DataContext` calls with API calls.
-
-## Deployment notes
-
-- Frontend: Vercel (build: `npm run build`, output: `dist`)
-- Backend: Railway/Render with `DATABASE_URL` and env vars
-- Database: Supabase/Neon/Postgres; run Prisma migrations on deploy
-
-Vercel tips:
-- Ensure `react` and `react-dom` versions match (this project targets React 18). Commit `package-lock.json` so Vercel installs the same versions you tested locally.
-
-## Roadmap: prototype → production (high-level)
-
-Phase 1 — Backend & Auth
-- Scaffold `server/` with Express, Prisma and auth endpoints
-- Setup `.env` and `DATABASE_URL`
-- Implement JWT auth, password hashing, and middleware
-
-Phase 2 — API integration
-- Replace `DataContext` with API service layer
-- Add token handling (HTTP-only cookie recommended) and protected routes
-- Add forms with React Hook Form + Zod
-
-Phase 3 — Admin & reporting
-- Implement user approvals, event management, attendance marking and exports
-
-Phase 4 — QA & deploy
-- Add tests (unit + integration)
-- Performance optimizations (code-splitting)
-- Deploy and run migrations on production DB
-
-## Security & best practices (summary)
-
-- Hash passwords with bcrypt (salt rounds >= 10)
-- Store secrets in env vars; configure platform secrets (Vercel/Railway)
-- Use HTTPS in production and secure cookies for tokens
-- Validate inputs both frontend (Zod) and backend (express-validator)
-- Rate-limit critical endpoints
-
-## How this prototype helps
-
-This prototype provides:
-
-- Reusable UI components and patterns to accelerate frontend work
-- Page layout and UX decisions (navigation, modals, tables)
-- Chart patterns for admin dashboards
-- Seed design ideas for API endpoints and DB schema
-
-Use the prototype as a visual & UX reference. The code will be refactored to call the backend services and to separate UI+data concerns.
+The output directory will be `dist`, which contains optimized HTML, CSS, and JS assets ready to be hosted on static hosting services like Vercel or Netlify.
