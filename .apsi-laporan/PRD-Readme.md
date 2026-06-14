@@ -12,7 +12,7 @@
 
 | No | Nama Lengkap | NIM | Peran (Role) | Tanggung Jawab Utama |
 | :---- | :---- | :---- | :---- | :---- |
-| 1 | Akmal Maulana | 2407040 | Project Manager & System Analyst | Merancang PRD, Arsitektur Basis Data, Validasi Alur Bisnis (RBAC), Koordinasi Dokumentasi (UML & DFD). |
+| 1 | Akmal Maulana | 2407040 | Project Manager & System Analyst | Merancang PRD, Arsitektur Basis Data, Validasi Alur Bisnis (RBAC), Koordinasi Dokumentasi (UML & DFD), serta pengujian sistem dan penyusunan skenario uji. |
 | 2 | Vicky Andika Irwanto | 2407044 | UI/UX & Front End Developer | Mengembangkan antarmuka interaktif dengan React/Vite, TailwindCSS, State Management, & Visualisasi Data (Recharts). |
 | 3 | Ripandi Gunawan | 2407038 | Database & Backend Integrator | Konfigurasi Supabase, Perancangan Skema PostgreSQL, Implementasi Row Level Security (RLS), & Integrasi Google Gemini AI. |
 

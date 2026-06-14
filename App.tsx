@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { DataProvider, useData } from './context/DataContext';
 import { Layout } from './components/Layout';
-import { ToastProvider } from './context/ToastContext';
+import { ToastProvider, useToast } from './context/ToastContext';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Events } from './pages/Events';
@@ -12,6 +12,23 @@ import { Loader2 } from 'lucide-react';
 const AppContent = () => {
   const { currentUser, isLoading } = useData();
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    // Check for Supabase email confirmation redirect hash
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=signup')) {
+      showToast('Email berhasil diverifikasi! Menunggu persetujuan admin.', 'success');
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    } else if (hash && hash.includes('error_description=')) {
+      const params = new URLSearchParams(hash.substring(1));
+      const errMsg = params.get('error_description');
+      if (errMsg) {
+        showToast(decodeURIComponent(errMsg.replace(/\+/g, ' ')), 'error');
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    }
+  }, [showToast]);
 
   useEffect(() => {
     if (!currentUser) {

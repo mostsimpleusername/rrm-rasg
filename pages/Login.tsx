@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
-import { ArrowRight, UserPlus, Loader2 } from 'lucide-react';
+import { ArrowRight, UserPlus, Loader2, Eye, EyeOff } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const { login, register } = useData();
@@ -10,6 +10,7 @@ export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -105,14 +106,25 @@ export const Login: React.FC = () => {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Kata Sandi</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
-              placeholder={isRegistering ? "Minimal 6 karakter" : "Masukkan kata sandi Anda"}
-              disabled={isSubmitting}
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 pr-12 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
+                placeholder={isRegistering ? "Minimal 6 karakter" : "Masukkan kata sandi Anda"}
+                disabled={isSubmitting}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(prev => !prev)}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600 disabled:cursor-not-allowed"
+                aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                disabled={isSubmitting}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <button
@@ -141,6 +153,7 @@ export const Login: React.FC = () => {
               onClick={() => {
                 setIsRegistering(!isRegistering);
                 setPassword('');
+                setShowPassword(false);
               }}
               className="ml-1 text-blue-600 font-medium hover:text-blue-700 focus:outline-none"
               disabled={isSubmitting}
