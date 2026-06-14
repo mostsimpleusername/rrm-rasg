@@ -44,7 +44,7 @@ export const Login: React.FC = () => {
         }
         const loginSuccess = await login(email, password);
         if (!loginSuccess) {
-          setError("Email/kata sandi tidak valid atau akun belum aktif/disetujui.");
+          setError("Email atau kata sandi tidak valid.");
         }
       }
     } catch (err: any) {

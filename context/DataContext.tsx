@@ -104,26 +104,30 @@ export const DataProvider = ({ children }: DataProviderProps) => {
    * Returns true on success, false on failure.
    */
   const login = async (email: string, password: string): Promise<boolean> => {
-    try {
-      const { user } = await authService.signIn(email, password);
-      if (user) {
-        const profile = await authService.getProfile(user.id);
-        if (profile) {
-          // Check if the user's account is active
-          if (profile.status !== 'Aktif') {
-            await authService.signOut();
-            return false;
-          }
-          setCurrentUser(profile);
-          await refreshData();
-          return true;
+    const { user } = await authService.signIn(email, password);
+    if (user) {
+      const profile = await authService.getProfile(user.id);
+      if (profile) {
+        // Check if the user's account is active
+        if (profile.status === 'Menunggu') {
+          await authService.signOut();
+          throw new Error('Akun Anda sedang menunggu persetujuan admin.');
         }
+        if (profile.status === 'Nonaktif') {
+          await authService.signOut();
+          throw new Error('Akun Anda telah dinonaktifkan.');
+        }
+        if (profile.status !== 'Aktif') {
+          await authService.signOut();
+          return false;
+        }
+        
+        setCurrentUser(profile);
+        await refreshData();
+        return true;
       }
-      return false;
-    } catch (err) {
-      console.error('Login error:', err);
-      return false;
     }
+    return false;
   };
 
   /**
