@@ -47,7 +47,7 @@ Membangun ekosistem perangkat lunak yang mampu mengelola siklus hidup keanggotaa
 | **FR-02** | Manajemen Anggota Lintas Divisi | Super Admin dapat mengatur seluruh anggota. Admin Divisi hanya dapat melihat/memodifikasi anggota divisinya. | High |
 | **FR-03** | Manajemen Kegiatan & Status Real-Time | Admin dapat membuat kegiatan. Status kegiatan (`Akan Datang`, `Berlangsung`, `Selesai`) dihitung otomatis berdasarkan waktu saat ini. | High |
 | **FR-04** | Konfirmasi Tindakan Keamanan | Pembatalan/penghapusan kegiatan secara permanen memerlukan *input text* manual dari nama kegiatan untuk mencegah *human error*. | Medium |
-| **FR-05** | Integrasi Gemini AI | Sistem menyediakan tombol Generate AI untuk menyusun deskripsi kegiatan secara otomatis berdasarkan Judul & Divisi. | High |
+| **FR-05** | Integrasi Gemini AI | Sistem menyediakan tombol Generate AI untuk menyusun deskripsi kegiatan secara otomatis berdasarkan Judul & Divisi. | Low |
 
 ### **3.2 Kebutuhan Non-Fungsional (Non-Functional Requirements)**
 

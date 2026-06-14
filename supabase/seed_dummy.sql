@@ -28,10 +28,11 @@ UPDATE public.profiles SET role = 'member', division = 'Kesehatan', status = 'No
 -- EVENTS
 -- ============================================================================
 
-INSERT INTO events (id, title, description, date, time, location, division, status, max_participants, created_by, attendees)
+-- We use specific UUIDs for events so we can insert attendees into the junction table
+INSERT INTO events (id, title, description, date, time, location, division, status, max_participants, created_by)
 VALUES
   (
-    gen_random_uuid(),
+    '00000000-0000-0000-0000-111111111111',
     'Pelatihan React JS Dasar',
     'Pelatihan internal divisi Ristek untuk pengenalan dasar React JS dan Vite bagi anggota baru.',
     '2026-07-20',
@@ -40,11 +41,10 @@ VALUES
     'Ristek',
     'Akan Datang',
     30,
-    '5e884898-888e-4f05-8fb9-9685a21ff461',
-    ARRAY['22222222-3333-4444-5555-666666666666'::uuid]
+    '5e884898-888e-4f05-8fb9-9685a21ff461'
   ),
   (
-    gen_random_uuid(),
+    '00000000-0000-0000-0000-222222222222',
     'Rapat Evaluasi Triwulan 1',
     'Rapat khusus untuk mengevaluasi program kerja divisi selama triwulan pertama tahun 2026.',
     '2026-03-30',
@@ -53,11 +53,10 @@ VALUES
     'HR',
     'Selesai',
     20,
-    'e1a49f50-3882-4bf1-a084-25e2cd0258d4',
-    ARRAY['e1a49f50-3882-4bf1-a084-25e2cd0258d4'::uuid, '11111111-2222-3333-4444-555555555555'::uuid]
+    'e1a49f50-3882-4bf1-a084-25e2cd0258d4'
   ),
   (
-    gen_random_uuid(),
+    '00000000-0000-0000-0000-333333333333',
     'Cek Kesehatan Gratis Warga',
     'Kegiatan lapangan untuk memberikan fasilitas cek tensi darah dan gula darah gratis bagi warga sekitar sekretariat.',
     '2026-08-15',
@@ -66,11 +65,10 @@ VALUES
     'Kesehatan',
     'Akan Datang',
     15,
-    'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
-    ARRAY[]::uuid[]
+    'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d'
   ),
   (
-    gen_random_uuid(),
+    '00000000-0000-0000-0000-444444444444',
     'Hackathon Internal RASG',
     'Lomba coding internal selama 24 jam untuk divisi Ristek membangun solusi aplikatif untuk RASG.',
     '2025-11-10',
@@ -79,6 +77,21 @@ VALUES
     'Ristek',
     'Dibatalkan',
     40,
-    '5e884898-888e-4f05-8fb9-9685a21ff461',
-    ARRAY['22222222-3333-4444-5555-666666666666'::uuid]
+    '5e884898-888e-4f05-8fb9-9685a21ff461'
   );
+
+-- ============================================================================
+-- EVENT ATTENDEES (Junction Table)
+-- ============================================================================
+
+INSERT INTO event_attendees (event_id, user_id)
+VALUES
+  -- Pelatihan React JS Dasar (Ristek)
+  ('00000000-0000-0000-0000-111111111111', '22222222-3333-4444-5555-666666666666'),
+  
+  -- Rapat Evaluasi Triwulan 1 (HR)
+  ('00000000-0000-0000-0000-222222222222', 'e1a49f50-3882-4bf1-a084-25e2cd0258d4'),
+  ('00000000-0000-0000-0000-222222222222', '11111111-2222-3333-4444-555555555555'),
+  
+  -- Hackathon Internal RASG (Ristek)
+  ('00000000-0000-0000-0000-444444444444', '22222222-3333-4444-5555-666666666666');
