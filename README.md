@@ -2,13 +2,6 @@
 
 ![Dashboard Preview](dashboard-preview.png)
 
-> [!TIP]
-> **Cara Menampilkan/Memperbaiki Preview Dashboard:**
-> 1. Jalankan proyek secara lokal (`npm run dev`) atau buka aplikasi Anda yang sudah di-deploy.
-> 2. Ambil tangkapan layar (*screenshot*) dari halaman dashboard utama.
-> 3. Simpan gambar tersebut dengan nama **`dashboard-preview.png`** di **direktori utama (root)** repositori ini.
-> 4. Lakukan `git commit` dan `git push` gambar tersebut ke GitHub untuk menggantikan placeholder ini dengan preview dashboard Anda sendiri.
-
 RRM-RASG is a modern, responsive web application designed to manage volunteers (members) and organizational events across multiple divisions. Built with performance and granular security in mind, the platform provides a unified dashboard for system administrators, division leads, and general members.
 
 ## 🌟 Key Features
