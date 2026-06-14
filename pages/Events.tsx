@@ -44,13 +44,13 @@ export const Events: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (editingEventId) {
       const originalEvent = events.find(e => e.id === editingEventId);
       if (originalEvent) {
-        updateEvent({
+        await updateEvent({
           ...originalEvent,
           title,
           description,
@@ -62,7 +62,7 @@ export const Events: React.FC = () => {
         });
       }
     } else {
-      addEvent({
+      await addEvent({
         title,
         description,
         date,
@@ -76,6 +76,7 @@ export const Events: React.FC = () => {
     setIsModalOpen(false);
     resetForm();
   };
+
 
   const resetForm = () => {
     setTitle('');

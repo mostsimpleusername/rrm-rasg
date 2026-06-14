@@ -1,32 +1,24 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Event, Role, Division, EventStatus } from '../types';
-
-// Mock Data
-const MOCK_USERS: User[] = [
-  { id: '1', name: 'Akmal Admin', email: 'admin@org.com', role: Role.SUPER_ADMIN, division: Division.GENERAL, status: 'Aktif', joinDate: '2023-01-01' },
-  { id: '2', name: 'Bowo SDM', email: 'wit@org.com', role: Role.DIVISION_ADMIN, division: Division.HR, status: 'Aktif', joinDate: '2023-02-15' },
-  { id: '3', name: 'Raka Anggota', email: 'fufu@org.com', role: Role.MEMBER, division: Division.RISTEK, status: 'Aktif', joinDate: '2023-03-10' },
-  { id: '4', name: 'Mulyo Tech', email: 'mul@org.com', role: Role.MEMBER, division: Division.RISTEK, status: 'Menunggu', joinDate: '2023-11-05' },
-];
-
-const MOCK_EVENTS: Event[] = [
-  { id: '101', title: 'Kick Off Moment 2026', description: 'Saatnya kita memulai perjalanan besar di tahun 2026 melalui Kick Off Moment 2026. Acara ini menjadi momentum awal untuk menyatukan visi, energi, dan langkah perjuangan kita bersama 🤝', date: '2026-02-01', time: '08:30', location: 'Dapur Kadtenjo', division: Division.HR, status: EventStatus.UPCOMING, attendees: ['1', '3'], maxParticipants: 100 },
-  { id: '102', title: 'Workshop Kesehatan Mental', description: 'Belajar menjaga kesehatan mental yang baik.', date: '2023-12-10', time: '14:00', location: 'Ruang 303', division: Division.KESEHATAN, status: EventStatus.COMPLETED, attendees: ['1', '2', '3'], maxParticipants: 50 },
-];
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { User, Event, Role } from '../types';
+import * as authService from '../services/authService';
+import * as userService from '../services/userService';
+import * as eventService from '../services/eventService';
 
 interface DataContextType {
   currentUser: User | null;
   users: User[];
   events: Event[];
-  login: (email: string) => boolean;
-  logout: () => void;
-  register: (name: string, email: string) => void;
-  addEvent: (event: Omit<Event, 'id' | 'attendees'>) => void;
-  updateEvent: (event: Event) => void;
-  deleteEvent: (id: string) => void;
-  registerForEvent: (eventId: string) => void;
-  updateUserStatus: (userId: string, status: User['status'], role?: Role) => void;
-  updateUserProfile: (userId: string, data: Partial<User>) => void;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
+  addEvent: (event: Omit<Event, 'id' | 'attendees'>) => Promise<void>;
+  updateEvent: (event: Event) => Promise<void>;
+  deleteEvent: (id: string) => Promise<void>;
+  registerForEvent: (eventId: string) => Promise<void>;
+  updateUserStatus: (userId: string, status: User['status'], role?: Role) => Promise<void>;
+  updateUserProfile: (userId: string, data: Partial<User>) => Promise<void>;
+  refreshData: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -37,108 +29,246 @@ interface DataProviderProps {
 
 export const DataProvider = ({ children }: DataProviderProps) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
-  const [events, setEvents] = useState<Event[]>(MOCK_EVENTS);
+  const [users, setUsers] = useState<User[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Simulate session persistence
-  useEffect(() => {
-    const savedUserId = localStorage.getItem('orgSync_userId');
-    if (savedUserId) {
-      const user = users.find(u => u.id === savedUserId);
-      if (user) setCurrentUser(user);
+  /**
+   * Fetch all data from Supabase (users + events).
+   * Called on initial load and after mutations.
+   */
+  const refreshData = useCallback(async () => {
+    try {
+      const [fetchedUsers, fetchedEvents] = await Promise.all([
+        userService.getUsers(),
+        eventService.getEvents(),
+      ]);
+      setUsers(fetchedUsers);
+      setEvents(fetchedEvents);
+    } catch (err) {
+      console.error('Error refreshing data:', err);
     }
   }, []);
 
-  const login = (email: string): boolean => {
-    const user = users.find(u => u.email === email && u.status === 'Aktif');
-    if (user) {
-      setCurrentUser(user);
-      localStorage.setItem('orgSync_userId', user.id);
-      return true;
-    }
-    return false;
-  };
+  /**
+   * On mount: check for an existing session, load user profile,
+   * and subscribe to auth state changes.
+   */
+  useEffect(() => {
+    let isMounted = true;
 
-  const logout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('orgSync_userId');
-  };
-
-  const register = (name: string, email: string) => {
-    const newUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      name,
-      email,
-      role: Role.MEMBER,
-      division: Division.GENERAL, // Default
-      status: 'Menunggu', // Needs approval
-      joinDate: new Date().toISOString().split('T')[0],
-    };
-    setUsers([...users, newUser]);
-  };
-
-  const addEvent = (eventData: Omit<Event, 'id' | 'attendees'>) => {
-    const newEvent: Event = {
-      ...eventData,
-      id: Math.random().toString(36).substr(2, 9),
-      attendees: [],
-    };
-    setEvents([newEvent, ...events]);
-  };
-
-  const updateEvent = (updatedEvent: Event) => {
-    setEvents(events.map(e => e.id === updatedEvent.id ? updatedEvent : e));
-  };
-
-  const deleteEvent = (id: string) => {
-    setEvents(events.filter(e => e.id !== id));
-  };
-
-  const registerForEvent = (eventId: string) => {
-    if (!currentUser) return;
-    setEvents(events.map(e => {
-      if (e.id === eventId) {
-        const isAttending = e.attendees.includes(currentUser.id);
-        if (isAttending) return e; // Already registered
-        return { ...e, attendees: [...e.attendees, currentUser.id] };
-      }
-      return e;
-    }));
-  };
-
-  const updateUserStatus = (userId: string, status: User['status'], role?: Role) => {
-    setUsers(prevUsers => {
-      const newUsers = prevUsers.map(u => {
-        if (u.id === userId) {
-          return { ...u, status, ...(role ? { role } : {}) };
-        }
-        return u;
-      });
-      return newUsers;
-    });
-  };
-
-  const updateUserProfile = (userId: string, data: Partial<User>) => {
-    setUsers(prevUsers => {
-      const newUsers = prevUsers.map(u => {
-        if (u.id === userId) {
-          const updated = { ...u, ...data };
-          if (currentUser?.id === userId) {
-            setCurrentUser(updated);
+    const initAuth = async () => {
+      try {
+        const session = await authService.getCurrentSession();
+        if (session?.user && isMounted) {
+          const profile = await authService.getProfile(session.user.id);
+          if (profile && isMounted) {
+            setCurrentUser(profile);
+            await refreshData();
           }
-          return updated;
         }
-        return u;
-      });
-      return newUsers;
+      } catch (err) {
+        console.error('Error initializing auth:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    initAuth();
+
+    // Subscribe to auth state changes (sign in/out, token refresh)
+    const subscription = authService.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        const profile = await authService.getProfile(session.user.id);
+        if (profile && isMounted) {
+          setCurrentUser(profile);
+          await refreshData();
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        setUsers([]);
+        setEvents([]);
+      }
     });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [refreshData]);
+
+  /**
+   * Login with email and password.
+   * Returns true on success, false on failure.
+   */
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const { user } = await authService.signIn(email, password);
+      if (user) {
+        const profile = await authService.getProfile(user.id);
+        if (profile) {
+          // Check if the user's account is active
+          if (profile.status !== 'Aktif') {
+            await authService.signOut();
+            return false;
+          }
+          setCurrentUser(profile);
+          await refreshData();
+          return true;
+        }
+      }
+      return false;
+    } catch (err) {
+      console.error('Login error:', err);
+      return false;
+    }
+  };
+
+  /**
+   * Logout the current user.
+   */
+  const logout = async () => {
+    try {
+      await authService.signOut();
+      setCurrentUser(null);
+      setUsers([]);
+      setEvents([]);
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
+
+  /**
+   * Register a new user. After signup, the `handle_new_user` trigger
+   * in PostgreSQL automatically creates a profiles row.
+   */
+  const register = async (name: string, email: string, password: string) => {
+    try {
+      await authService.signUp(email, password, name);
+      // Don't log them in — their status will be 'Menunggu' until an admin approves
+    } catch (err) {
+      console.error('Registration error:', err);
+      throw err;
+    }
+  };
+
+  /**
+   * Create a new event. Only admins should call this.
+   */
+  const addEvent = async (eventData: Omit<Event, 'id' | 'attendees'>) => {
+    if (!currentUser) return;
+    try {
+      const newEvent = await eventService.createEvent(eventData, currentUser.id);
+      setEvents(prev => [newEvent, ...prev]);
+    } catch (err) {
+      console.error('Error adding event:', err);
+      throw err;
+    }
+  };
+
+  /**
+   * Update an existing event.
+   */
+  const updateEventHandler = async (updatedEvent: Event) => {
+    try {
+      const result = await eventService.updateEvent(updatedEvent);
+      setEvents(prev => prev.map(e => e.id === result.id ? result : e));
+    } catch (err) {
+      console.error('Error updating event:', err);
+      throw err;
+    }
+  };
+
+  /**
+   * Delete an event.
+   */
+  const deleteEventHandler = async (id: string) => {
+    try {
+      await eventService.deleteEvent(id);
+      setEvents(prev => prev.filter(e => e.id !== id));
+    } catch (err) {
+      console.error('Error deleting event:', err);
+      throw err;
+    }
+  };
+
+  /**
+   * Register the current user for an event.
+   * Optimistically updates local state, then confirms with the server.
+   */
+  const registerForEventHandler = async (eventId: string) => {
+    if (!currentUser) return;
+    try {
+      await eventService.registerForEvent(eventId, currentUser.id);
+      // Optimistic update
+      setEvents(prev =>
+        prev.map(e => {
+          if (e.id === eventId && !e.attendees.includes(currentUser.id)) {
+            return { ...e, attendees: [...e.attendees, currentUser.id] };
+          }
+          return e;
+        })
+      );
+    } catch (err) {
+      console.error('Error registering for event:', err);
+      // Revert on error
+      await refreshData();
+    }
+  };
+
+  /**
+   * Update a user's status (and optionally role). Used by admins
+   * to approve/reject members.
+   */
+  const updateUserStatusHandler = async (
+    userId: string,
+    status: User['status'],
+    role?: Role
+  ) => {
+    try {
+      const updated = await userService.updateUserStatus(userId, status, role);
+      setUsers(prev => prev.map(u => u.id === userId ? updated : u));
+    } catch (err) {
+      console.error('Error updating user status:', err);
+      throw err;
+    }
+  };
+
+  /**
+   * Update profile fields for a user.
+   */
+  const updateUserProfileHandler = async (userId: string, data: Partial<User>) => {
+    try {
+      const updated = await userService.updateUserProfile(userId, data);
+      setUsers(prev => prev.map(u => u.id === userId ? updated : u));
+      // If the current user updated their own profile, update that too
+      if (currentUser?.id === userId) {
+        setCurrentUser(updated);
+      }
+    } catch (err) {
+      console.error('Error updating user profile:', err);
+      throw err;
+    }
   };
 
   return (
     <DataContext.Provider value={{
-      currentUser, users, events,
-      login, logout, register,
-      addEvent, updateEvent, deleteEvent, registerForEvent, updateUserStatus, updateUserProfile
+      currentUser,
+      users,
+      events,
+      isLoading,
+      login,
+      logout,
+      register,
+      addEvent,
+      updateEvent: updateEventHandler,
+      deleteEvent: deleteEventHandler,
+      registerForEvent: registerForEventHandler,
+      updateUserStatus: updateUserStatusHandler,
+      updateUserProfile: updateUserProfileHandler,
+      refreshData,
     }}>
       {children}
     </DataContext.Provider>

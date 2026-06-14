@@ -1,39 +1,56 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
-import { ArrowRight, UserPlus } from 'lucide-react';
+import { ArrowRight, UserPlus, Loader2 } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const { login, register } = useData();
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+    setIsSubmitting(true);
 
-    if (isRegistering) {
-      if (!name || !email) {
-        setError("Harap isi semua kolom");
-        return;
+    try {
+      if (isRegistering) {
+        if (!name || !email || !password) {
+          setError("Harap isi semua kolom");
+          setIsSubmitting(false);
+          return;
+        }
+        if (password.length < 6) {
+          setError("Kata sandi minimal 6 karakter");
+          setIsSubmitting(false);
+          return;
+        }
+        await register(name, email, password);
+        setSuccess("Pendaftaran berhasil! Harap tunggu persetujuan admin.");
+        setIsRegistering(false);
+        setName('');
+        setEmail('');
+        setPassword('');
+      } else {
+        if (!email || !password) {
+          setError("Harap masukkan email dan kata sandi Anda");
+          setIsSubmitting(false);
+          return;
+        }
+        const loginSuccess = await login(email, password);
+        if (!loginSuccess) {
+          setError("Email/kata sandi tidak valid atau akun belum aktif/disetujui.");
+        }
       }
-      register(name, email);
-      setSuccess("Pendaftaran berhasil! Harap tunggu persetujuan admin.");
-      setIsRegistering(false);
-      setName('');
-      setEmail('');
-    } else {
-      if (!email) {
-        setError("Harap masukkan email Anda");
-        return;
-      }
-      const success = login(email);
-      if (!success) {
-        setError("Email tidak valid atau akun belum aktif/disetujui.");
-      }
+    } catch (err: any) {
+      setError(err?.message || "Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -81,6 +98,7 @@ export const Login: React.FC = () => {
                 onChange={(e) => setName(e.target.value)}
                 className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
                 placeholder="John Doe"
+                disabled={isSubmitting}
               />
             </div>
           )}
@@ -93,15 +111,38 @@ export const Login: React.FC = () => {
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
               placeholder="Masukkan email Anda"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Kata Sandi</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
+              placeholder={isRegistering ? "Minimal 6 karakter" : "Masukkan kata sandi Anda"}
+              disabled={isSubmitting}
             />
           </div>
 
           <button
             type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center space-x-2"
+            disabled={isSubmitting}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center space-x-2"
           >
-            <span>{isRegistering ? 'Daftar' : 'Masuk'}</span>
-            {isRegistering ? <UserPlus size={18} /> : <ArrowRight size={18} />}
+            {isSubmitting ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                <span>Memproses...</span>
+              </>
+            ) : (
+              <>
+                <span>{isRegistering ? 'Daftar' : 'Masuk'}</span>
+                {isRegistering ? <UserPlus size={18} /> : <ArrowRight size={18} />}
+              </>
+            )}
           </button>
         </form>
 
@@ -113,24 +154,15 @@ export const Login: React.FC = () => {
                 setIsRegistering(!isRegistering);
                 setError('');
                 setSuccess('');
+                setPassword('');
               }}
               className="ml-1 text-blue-600 font-medium hover:text-blue-700 focus:outline-none"
+              disabled={isSubmitting}
             >
               {isRegistering ? 'Masuk' : 'Buat akun'}
             </button>
           </p>
         </div>
-
-        {!isRegistering && (
-          <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-             <p className="text-xs text-slate-400 mb-2">Akun Demo:</p>
-             <div className="flex flex-wrap gap-2 justify-center">
-               <button onClick={() => login('admin@org.com')} className="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded">Admin</button>
-               <button onClick={() => login('wit@org.com')} className="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded">Admin SDM</button>
-               <button onClick={() => login('fufu@org.com')} className="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded">Anggota</button>
-             </div>
-          </div>
-        )}
       </div>
     </div>
   );
