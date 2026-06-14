@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DataProvider, useData } from './context/DataContext';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
@@ -11,6 +11,12 @@ import { Loader2 } from 'lucide-react';
 const AppContent = () => {
   const { currentUser, isLoading } = useData();
   const [currentPage, setCurrentPage] = useState('dashboard');
+
+  useEffect(() => {
+    if (!currentUser) {
+      setCurrentPage('dashboard');
+    }
+  }, [currentUser]);
 
   if (isLoading) {
     return (

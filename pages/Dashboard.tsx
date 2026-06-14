@@ -1,6 +1,6 @@
 import React from 'react';
 import { useData } from '../context/DataContext';
-import { Role, Division, EventStatus } from '../types';
+import { Role, Division, EventStatus, getComputedStatus } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Users, Calendar, TrendingUp, Award, Clock, MapPin, CheckCircle2 } from 'lucide-react';
 
@@ -34,9 +34,9 @@ export const Dashboard: React.FC = () => {
     }));
 
   const eventStatusData = [
-    { name: 'Akan Datang', value: events.filter(e => e.status === 'Akan Datang').length },
-    { name: 'Selesai', value: events.filter(e => e.status === 'Selesai').length },
-    { name: 'Berlangsung', value: events.filter(e => e.status === 'Berlangsung').length },
+    { name: 'Akan Datang', value: events.filter(e => getComputedStatus(e) === 'Akan Datang').length },
+    { name: 'Selesai', value: events.filter(e => getComputedStatus(e) === 'Selesai' || getComputedStatus(e) === 'Dibatalkan').length },
+    { name: 'Berlangsung', value: events.filter(e => getComputedStatus(e) === 'Berlangsung').length },
   ];
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
@@ -58,11 +58,11 @@ export const Dashboard: React.FC = () => {
   // MEMBER VIEW
   if (currentUser?.role === Role.MEMBER) {
     const myUpcomingEvents = events.filter(e => 
-      e.status === EventStatus.UPCOMING && e.attendees.includes(currentUser.id)
+      getComputedStatus(e) === EventStatus.UPCOMING && e.attendees.includes(currentUser.id)
     );
     
     const availableEvents = events.filter(e => 
-      e.status === EventStatus.UPCOMING && !e.attendees.includes(currentUser.id)
+      getComputedStatus(e) === EventStatus.UPCOMING && !e.attendees.includes(currentUser.id)
     );
 
     return (

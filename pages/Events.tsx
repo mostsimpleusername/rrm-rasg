@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
-import { Event, Role, EventStatus, Division } from '../types';
-import { CalendarPlus, MapPin, Calendar, Clock, Sparkles, Trash2, Edit2, Users } from 'lucide-react';
+import { Event, Role, EventStatus, Division, getComputedStatus } from '../types';
+import { CalendarPlus, MapPin, Calendar, Clock, Sparkles, Trash2, Edit2, Users, AlertCircle } from 'lucide-react';
 import { generateEventDescription } from '../services/geminiService';
 
 export const Events: React.FC = () => {
@@ -30,16 +30,7 @@ export const Events: React.FC = () => {
 
   const isAdmin = currentUser?.role === Role.SUPER_ADMIN || currentUser?.role === Role.DIVISION_ADMIN;
 
-  const getComputedStatus = (event: Event): EventStatus => {
-    if (event.status === EventStatus.CANCELLED) return EventStatus.CANCELLED;
-    const eventDateTime = new Date(`${event.date}T${event.time}`);
-    const now = new Date();
-    const eventEnd = new Date(eventDateTime.getTime() + 3 * 60 * 60 * 1000);
-    
-    if (now < eventDateTime) return EventStatus.UPCOMING;
-    if (now >= eventDateTime && now <= eventEnd) return EventStatus.ONGOING;
-    return EventStatus.COMPLETED;
-  };
+
 
 
   const handleGenerateDescription = async () => {
@@ -156,6 +147,12 @@ export const Events: React.FC = () => {
               </div>
               
               <h3 className="text-lg font-bold text-slate-900 mb-2">{event.title}</h3>
+              {getComputedStatus(event) !== EventStatus.UPCOMING && (
+                <div className="mb-3 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-500 flex items-start gap-2">
+                  <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+                  <p>Kegiatan ini telah {getComputedStatus(event).toLowerCase()} dan tidak lagi menerima pendaftaran peserta baru.</p>
+                </div>
+              )}
               <p className="text-slate-600 text-sm mb-4 line-clamp-2">{event.description}</p>
               
               <div className="space-y-2 mb-6">
@@ -213,17 +210,24 @@ export const Events: React.FC = () => {
                       </button>
                     </>
                   ) : !isAdmin ? (
-
                     <button 
                       onClick={() => setEventToJoin(event)}
                       disabled={event.attendees.includes(currentUser?.id || '') || getComputedStatus(event) !== EventStatus.UPCOMING}
                       className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                         event.attendees.includes(currentUser?.id || '')
                           ? 'bg-green-50 text-green-700'
+                          : getComputedStatus(event) !== EventStatus.UPCOMING
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                           : 'bg-blue-600 text-white hover:bg-blue-700'
                       }`}
                     >
-                      {event.attendees.includes(currentUser?.id || '') ? 'Terdaftar' : 'Gabung'}
+                      {event.attendees.includes(currentUser?.id || '') 
+                        ? 'Terdaftar' 
+                        : getComputedStatus(event) === EventStatus.CANCELLED
+                        ? 'Dibatalkan'
+                        : getComputedStatus(event) !== EventStatus.UPCOMING
+                        ? 'Selesai'
+                        : 'Gabung'}
                     </button>
                   ) : null}
                 </div>
