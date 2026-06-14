@@ -63,8 +63,12 @@ export const DataProvider = ({ children }: DataProviderProps) => {
         if (session?.user && isMounted) {
           const profile = await authService.getProfile(session.user.id);
           if (profile && isMounted) {
-            setCurrentUser(profile);
-            await refreshData();
+            if (profile.status === 'Aktif') {
+              setCurrentUser(profile);
+              await refreshData();
+            } else {
+              await authService.signOut();
+            }
           }
         }
       } catch (err) {
@@ -83,8 +87,13 @@ export const DataProvider = ({ children }: DataProviderProps) => {
       if (event === 'SIGNED_IN' && session?.user) {
         const profile = await authService.getProfile(session.user.id);
         if (profile && isMounted) {
-          setCurrentUser(profile);
-          await refreshData();
+          if (profile.status === 'Aktif') {
+            setCurrentUser(profile);
+            await refreshData();
+          } else {
+            // Do not call signOut here because login() handles the specific error messages and will call signOut.
+            // If we call signOut here, it could race with login(). Just do not set currentUser.
+          }
         }
       } else if (event === 'SIGNED_OUT') {
         setCurrentUser(null);
