@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
+import { useToast } from '../context/ToastContext';
 import { Event, Role, EventStatus, Division, getComputedStatus } from '../types';
-import { CalendarPlus, MapPin, Calendar, Clock, Sparkles, Trash2, Edit2, Users, AlertCircle } from 'lucide-react';
+import { CalendarPlus, MapPin, Calendar, Clock, Sparkles, Trash2, Edit2, Users, AlertCircle, Search, Loader2 } from 'lucide-react';
 import { generateEventDescription } from '../services/geminiService';
 
 export const Events: React.FC = () => {
   
-  const { events, currentUser, addEvent, updateEvent, deleteEvent, registerForEvent, users } = useData();
+  const { users, events, currentUser, addEvent, updateEvent, deleteEvent, registerForEvent, addAttendeeToEvent } = useData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -14,6 +15,14 @@ export const Events: React.FC = () => {
   const [eventToCancel, setEventToCancel] = useState<Event | null>(null);
   const [cancelConfirmationName, setCancelConfirmationName] = useState('');
   const [eventToAddAttendees, setEventToAddAttendees] = useState<Event | null>(null);
+  const [searchMemberQuery, setSearchMemberQuery] = useState('');
+  
+  const { showToast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [addingAttendeeId, setAddingAttendeeId] = useState<string | null>(null);
+  const [isJoining, setIsJoining] = useState(false);
   const [eventToJoin, setEventToJoin] = useState<Event | null>(null);
   const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
   const [deleteConfirmationName, setDeleteConfirmationName] = useState('');
@@ -58,12 +67,26 @@ export const Events: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    if (editingEventId) {
-      const originalEvent = events.find(e => e.id === editingEventId);
-      if (originalEvent) {
-        await updateEvent({
-          ...originalEvent,
+    try {
+      if (editingEventId) {
+        const originalEvent = events.find(e => e.id === editingEventId);
+        if (originalEvent) {
+          await updateEvent({
+            ...originalEvent,
+            title,
+            description,
+            date,
+            time,
+            location,
+            division,
+            status,
+          });
+        }
+        showToast('Kegiatan berhasil diperbarui!', 'success');
+      } else {
+        await addEvent({
           title,
           description,
           date,
@@ -71,22 +94,17 @@ export const Events: React.FC = () => {
           location,
           division,
           status,
+          maxParticipants: 50,
         });
+        showToast('Kegiatan berhasil ditambahkan!', 'success');
       }
-    } else {
-      await addEvent({
-        title,
-        description,
-        date,
-        time,
-        location,
-        division,
-        status,
-        maxParticipants: 50,
-      });
+      setIsModalOpen(false);
+      resetForm();
+    } catch (error) {
+      showToast('Gagal menyimpan kegiatan.', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsModalOpen(false);
-    resetForm();
   };
 
 
@@ -134,15 +152,18 @@ export const Events: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {events.map((event) => (
+        {events.filter(e => {
+          if (currentUser?.role === Role.SUPER_ADMIN) return true;
+          return e.division === Division.GENERAL || e.division === currentUser?.division;
+        }).map((event) => (
           <div key={event.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
             <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
+              <div className="flex flex-wrap gap-2 justify-between items-start mb-4">
                 <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusColor(getComputedStatus(event))}`}>
                   {getComputedStatus(event)}
                 </span>
-                <span className="text-xs font-medium text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100">
-                  {event.division}
+                <span className={`text-xs font-medium px-2 py-1 rounded border ${event.division === Division.GENERAL ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>
+                  Terbuka: {event.division === Division.GENERAL ? 'Semua Divisi' : `Divisi ${event.division}`}
                 </span>
               </div>
               
@@ -296,22 +317,21 @@ export const Events: React.FC = () => {
                 </div>
                  
                  <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Divisi</label>
-                  {currentUser?.role === Role.SUPER_ADMIN ? (
-                    <select
-                      value={division}
-                      onChange={(e) => setDivision(e.target.value as Division)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                    >
-                      {Object.values(Division).filter(div => div !== Division.GENERAL).map(div => (
-                      <option key={div} value={div}>{div}</option>
-                    ))}
-                    </select>
-                  ) : (
-                    <div className="w-full px-3 py-2 border border-slate-200 bg-slate-50 rounded-lg text-slate-700">
-                      {division}
-                    </div>
-                  )}
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Target Peserta (Divisi)</label>
+                  <select
+                    value={division}
+                    onChange={(e) => setDivision(e.target.value as Division)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                  >
+                    <option value={Division.GENERAL}>Semua Divisi (Umum)</option>
+                    {currentUser?.role === Role.SUPER_ADMIN ? (
+                      Object.values(Division).filter(div => div !== Division.GENERAL).map(div => (
+                        <option key={div} value={div}>Khusus Divisi {div}</option>
+                      ))
+                    ) : (
+                      <option value={currentUser?.division}>Khusus Divisi {currentUser?.division}</option>
+                    )}
+                  </select>
                 </div>
 
               </div>
@@ -352,6 +372,7 @@ export const Events: React.FC = () => {
                   type="submit"
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
                 >
+                  {isSubmitting ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
                   {editingEventId ? 'Simpan Perubahan' : 'Buat Kegiatan'}
                 </button>
               </div>
@@ -387,12 +408,21 @@ export const Events: React.FC = () => {
               <button 
                 disabled={cancelConfirmationName !== eventToCancel.title}
                 onClick={async () => {
-                  await updateEvent({ ...eventToCancel, status: EventStatus.CANCELLED });
-                  setEventToCancel(null);
-                  setCancelConfirmationName('');
+                  setIsCancelling(true);
+                  try {
+                    await updateEvent({ ...eventToCancel, status: EventStatus.CANCELLED });
+                    showToast('Kegiatan berhasil dibatalkan.', 'success');
+                    setEventToCancel(null);
+                    setCancelConfirmationName('');
+                  } catch (error) {
+                    showToast('Gagal membatalkan kegiatan.', 'error');
+                  } finally {
+                    setIsCancelling(false);
+                  }
                 }}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-red-600 text-white flex items-center justify-center rounded-lg hover:bg-red-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
+                {isCancelling ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
                 Batalkan
               </button>
             </div>
@@ -403,16 +433,34 @@ export const Events: React.FC = () => {
       {/* Add Attendees Modal */}
       {eventToAddAttendees && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl max-w-md w-full max-h-[80vh] flex flex-col shadow-2xl">
+          <div className="bg-white rounded-xl max-w-md w-full max-h-[85vh] flex flex-col shadow-2xl">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
               <h3 className="text-lg font-bold text-slate-900">Tambah Peserta</h3>
-              <button onClick={() => setEventToAddAttendees(null)} className="text-slate-400 hover:text-slate-600">×</button>
+              <button onClick={() => {
+                setEventToAddAttendees(null);
+                setSearchMemberQuery('');
+              }} className="text-slate-400 hover:text-slate-600">×</button>
             </div>
-            <div className="p-6 overflow-y-auto flex-1">
+            
+            <div className="px-6 py-4 border-b border-slate-100">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input
+                  type="text"
+                  placeholder="Cari nama anggota..."
+                  value={searchMemberQuery}
+                  onChange={(e) => setSearchMemberQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
               <div className="space-y-2">
                 {users
                   .filter(u => u.status === 'Aktif' && !eventToAddAttendees.attendees.includes(u.id))
                   .filter(u => currentUser?.role === Role.SUPER_ADMIN || u.division === currentUser?.division)
+                  .filter(u => u.name.toLowerCase().includes(searchMemberQuery.toLowerCase()))
                   .map(user => (
                     <div key={user.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-lg hover:border-blue-100">
                       <div>
@@ -420,19 +468,33 @@ export const Events: React.FC = () => {
                         <p className="text-xs text-slate-500">{user.division}</p>
                       </div>
                       <button
+                        disabled={addingAttendeeId === user.id}
                         onClick={async () => {
-                          const newEvent = { ...eventToAddAttendees, attendees: [...eventToAddAttendees.attendees, user.id] };
-                          await updateEvent(newEvent);
-                          setEventToAddAttendees(newEvent);
+                          setAddingAttendeeId(user.id);
+                          try {
+                            await addAttendeeToEvent(eventToAddAttendees.id, user.id);
+                            setEventToAddAttendees({ 
+                              ...eventToAddAttendees, 
+                              attendees: [...eventToAddAttendees.attendees, user.id] 
+                            });
+                            showToast(`${user.name} berhasil ditambahkan!`, 'success');
+                          } catch (error) {
+                            showToast(`Gagal menambahkan ${user.name}.`, 'error');
+                          } finally {
+                            setAddingAttendeeId(null);
+                          }
                         }}
-                        className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded"
+                        className="px-3 py-1 flex items-center text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                       >
+                        {addingAttendeeId === user.id ? <Loader2 className="animate-spin mr-1" size={12} /> : null}
                         Tambah
                       </button>
                     </div>
                 ))}
-                {users.filter(u => u.status === 'Aktif' && !eventToAddAttendees.attendees.includes(u.id)).filter(u => currentUser?.role === Role.SUPER_ADMIN || u.division === currentUser?.division).length === 0 && (
-                  <p className="text-center text-slate-500 text-sm">Semua anggota yang tersedia sudah terdaftar.</p>
+                {users.filter(u => u.status === 'Aktif' && !eventToAddAttendees.attendees.includes(u.id))
+                      .filter(u => currentUser?.role === Role.SUPER_ADMIN || u.division === currentUser?.division)
+                      .filter(u => u.name.toLowerCase().includes(searchMemberQuery.toLowerCase())).length === 0 && (
+                  <p className="text-center text-slate-500 text-sm">Tidak ada anggota yang cocok dengan pencarian atau semua sudah terdaftar.</p>
                 )}
               </div>
             </div>
@@ -455,12 +517,22 @@ export const Events: React.FC = () => {
                 Batal
               </button>
               <button 
+                disabled={isJoining}
                 onClick={async () => {
-                  await registerForEvent(eventToJoin.id);
-                  setEventToJoin(null);
+                  setIsJoining(true);
+                  try {
+                    await registerForEvent(eventToJoin.id);
+                    showToast('Berhasil bergabung ke kegiatan!', 'success');
+                  } catch (error) {
+                    showToast('Gagal bergabung ke kegiatan.', 'error');
+                  } finally {
+                    setIsJoining(false);
+                    setEventToJoin(null);
+                  }
                 }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm"
+                className="px-4 py-2 bg-blue-600 flex items-center text-white rounded-lg hover:bg-blue-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
+                {isJoining ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
                 Ya, Gabung
               </button>
             </div>
@@ -494,14 +566,23 @@ export const Events: React.FC = () => {
                 Batal
               </button>
               <button 
-                disabled={deleteConfirmationName !== eventToDelete.title}
+                disabled={deleteConfirmationName !== eventToDelete.title || isDeleting}
                 onClick={async () => {
-                  await deleteEvent(eventToDelete.id);
-                  setEventToDelete(null);
-                  setDeleteConfirmationName('');
+                  setIsDeleting(true);
+                  try {
+                    await deleteEvent(eventToDelete.id);
+                    showToast('Kegiatan berhasil dihapus secara permanen.', 'success');
+                    setEventToDelete(null);
+                    setDeleteConfirmationName('');
+                  } catch (error) {
+                    showToast('Gagal menghapus kegiatan.', 'error');
+                  } finally {
+                    setIsDeleting(false);
+                  }
                 }}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-red-600 text-white flex items-center rounded-lg hover:bg-red-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
+                {isDeleting ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
                 Hapus Permanen
               </button>
             </div>

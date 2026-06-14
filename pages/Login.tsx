@@ -1,54 +1,54 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
+import { useToast } from '../context/ToastContext';
 import { ArrowRight, UserPlus, Loader2 } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const { login, register } = useData();
+  const { showToast } = useToast();
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
     setIsSubmitting(true);
 
     try {
       if (isRegistering) {
         if (!name || !email || !password) {
-          setError("Harap isi semua kolom");
+          showToast("Harap isi semua kolom", "error");
           setIsSubmitting(false);
           return;
         }
         if (password.length < 6) {
-          setError("Kata sandi minimal 6 karakter");
+          showToast("Kata sandi minimal 6 karakter", "error");
           setIsSubmitting(false);
           return;
         }
         await register(name, email, password);
-        setSuccess("Pendaftaran berhasil! Harap tunggu persetujuan admin.");
+        showToast("Pendaftaran berhasil! Harap tunggu persetujuan admin.", "success");
         setIsRegistering(false);
         setName('');
         setEmail('');
         setPassword('');
       } else {
         if (!email || !password) {
-          setError("Harap masukkan email dan kata sandi Anda");
+          showToast("Harap masukkan email dan kata sandi Anda", "error");
           setIsSubmitting(false);
           return;
         }
         const loginSuccess = await login(email, password);
         if (!loginSuccess) {
-          setError("Email atau kata sandi tidak valid.");
+          showToast("Email atau kata sandi tidak valid.", "error");
+        } else {
+          showToast("Berhasil masuk!", "success");
         }
       }
     } catch (err: any) {
-      setError(err?.message || "Terjadi kesalahan. Silakan coba lagi.");
+      showToast(err?.message || "Terjadi kesalahan. Silakan coba lagi.", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -75,18 +75,6 @@ export const Login: React.FC = () => {
               : 'Masuk untuk mengakses dasbor Anda'}
           </p>
         </div>
-
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg">
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-100 text-green-600 text-sm rounded-lg">
-            {success}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {isRegistering && (
@@ -152,8 +140,6 @@ export const Login: React.FC = () => {
             <button
               onClick={() => {
                 setIsRegistering(!isRegistering);
-                setError('');
-                setSuccess('');
                 setPassword('');
               }}
               className="ml-1 text-blue-600 font-medium hover:text-blue-700 focus:outline-none"

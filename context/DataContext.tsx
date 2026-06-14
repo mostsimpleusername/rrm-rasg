@@ -16,6 +16,8 @@ interface DataContextType {
   updateEvent: (event: Event) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
   registerForEvent: (eventId: string) => Promise<void>;
+  addAttendeeToEvent: (eventId: string, userId: string) => Promise<void>;
+  removeAttendeeFromEvent: (eventId: string, userId: string) => Promise<void>;
   updateUserStatus: (userId: string, status: User['status'], role?: Role) => Promise<void>;
   updateUserProfile: (userId: string, data: Partial<User>) => Promise<void>;
   refreshData: () => Promise<void>;
@@ -226,8 +228,37 @@ export const DataProvider = ({ children }: DataProviderProps) => {
       );
     } catch (err) {
       console.error('Error registering for event:', err);
-      // Revert on error
       await refreshData();
+    }
+  };
+
+  const addAttendeeToEventHandler = async (eventId: string, userId: string) => {
+    try {
+      await eventService.registerForEvent(eventId, userId);
+      setEvents(prev => prev.map(e => {
+        if (e.id === eventId && !e.attendees.includes(userId)) {
+          return { ...e, attendees: [...e.attendees, userId] };
+        }
+        return e;
+      }));
+    } catch (err) {
+      console.error('Error adding attendee to event:', err);
+      throw err;
+    }
+  };
+
+  const removeAttendeeFromEventHandler = async (eventId: string, userId: string) => {
+    try {
+      await eventService.unregisterFromEvent(eventId, userId);
+      setEvents(prev => prev.map(e => {
+        if (e.id === eventId) {
+          return { ...e, attendees: e.attendees.filter(id => id !== userId) };
+        }
+        return e;
+      }));
+    } catch (err) {
+      console.error('Error removing attendee from event:', err);
+      throw err;
     }
   };
 
@@ -279,6 +310,8 @@ export const DataProvider = ({ children }: DataProviderProps) => {
       updateEvent: updateEventHandler,
       deleteEvent: deleteEventHandler,
       registerForEvent: registerForEventHandler,
+      addAttendeeToEvent: addAttendeeToEventHandler,
+      removeAttendeeFromEvent: removeAttendeeFromEventHandler,
       updateUserStatus: updateUserStatusHandler,
       updateUserProfile: updateUserProfileHandler,
       refreshData,

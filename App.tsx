@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { DataProvider, useData } from './context/DataContext';
 import { Layout } from './components/Layout';
+import { ToastProvider } from './context/ToastContext';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Events } from './pages/Events';
@@ -52,9 +53,11 @@ const AppContent = () => {
 
 function App() {
   return (
-    <DataProvider>
-      <AppContent />
-    </DataProvider>
+    <ToastProvider>
+      <DataProvider>
+        <AppContent />
+      </DataProvider>
+    </ToastProvider>
   );
 }
 

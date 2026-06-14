@@ -1,52 +1,45 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
+import { useToast } from '../context/ToastContext';
 import { Role, Division, EventStatus, getComputedStatus } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Users, Calendar, TrendingUp, Award, Clock, MapPin, CheckCircle2 } from 'lucide-react';
+import { Users, Calendar, TrendingUp, Award, Clock, MapPin, CheckCircle2, Loader2 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
   const { users: allUsers, events, currentUser, registerForEvent } = useData();
+  const { showToast } = useToast();
+  const [loadingEventId, setLoadingEventId] = useState<string | null>(null);
 
   // Exclude 'Umum' division from dashboard metrics
-  const users = allUsers.filter(u => u.division !== Division.GENERAL);
+  const activeUsers = allUsers.filter(u => u.division !== Division.GENERAL);
 
-  const totalMembers = users.length;
-  const activeMembers = users.filter(u => u.status === 'Aktif').length;
-  const totalEvents = events.length;
-  
-  // Calculate attendance rate (mock calculation)
-  const totalPossibleAttendance = events.length * users.length; // Simplified
-  const actualAttendance = events.reduce((acc, curr) => {
-    const validAttendees = curr.attendees.filter(id => users.some(u => u.id === id));
-    return acc + validAttendees.length;
-  }, 0);
-  
-  const attendanceRate = totalPossibleAttendance > 0 
-    ? Math.round((actualAttendance / totalPossibleAttendance) * 100) 
-    : 0;
+  const totalMembers = activeUsers.length;
+  const totalEvents = events.filter(e => getComputedStatus(e) === EventStatus.ONGOING || getComputedStatus(e) === EventStatus.UPCOMING).length;
+  const activeMembers = activeUsers.filter(u => u.status === 'Aktif').length;
+  const attendanceRate = totalMembers > 0 ? Math.round((activeUsers.filter(u => events.some(e => e.attendees.includes(u.id))).length / totalMembers) * 100) : 0;
 
-  // Prepare data for charts
   const divisionData = Object.values(Division)
-    .filter(div => div !== Division.GENERAL)
+    .filter(d => d !== Division.GENERAL)
     .map(div => ({
       name: div,
-      count: users.filter(u => u.division === div).length
+      count: activeUsers.filter(u => u.division === div).length
     }));
 
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#6366f1'];
+  
   const eventStatusData = [
-    { name: 'Akan Datang', value: events.filter(e => getComputedStatus(e) === 'Akan Datang').length },
-    { name: 'Selesai', value: events.filter(e => getComputedStatus(e) === 'Selesai' || getComputedStatus(e) === 'Dibatalkan').length },
-    { name: 'Berlangsung', value: events.filter(e => getComputedStatus(e) === 'Berlangsung').length },
-  ];
+    { name: 'Akan Datang', value: events.filter(e => getComputedStatus(e) === EventStatus.UPCOMING).length },
+    { name: 'Berlangsung', value: events.filter(e => getComputedStatus(e) === EventStatus.ONGOING).length },
+    { name: 'Selesai', value: events.filter(e => getComputedStatus(e) === EventStatus.COMPLETED).length },
+    { name: 'Dibatalkan', value: events.filter(e => getComputedStatus(e) === EventStatus.CANCELLED).length },
+  ].filter(d => d.value > 0);
 
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
-
-  const StatCard = ({ title, value, icon: Icon, color }: { title: string, value: string | number, icon: any, color: string }) => (
+  const StatCard = ({ title, value, icon: Icon, color }: any) => (
     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-slate-500">{title}</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">{value}</p>
+          <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
+          <p className="text-2xl font-bold text-slate-900">{value}</p>
         </div>
         <div className={`p-3 rounded-lg ${color} bg-opacity-10`}>
           <Icon className={color.replace('bg-', 'text-')} size={24} />
@@ -55,14 +48,28 @@ export const Dashboard: React.FC = () => {
     </div>
   );
 
+  const handleRegisterEvent = async (eventId: string) => {
+    setLoadingEventId(eventId);
+    try {
+      await registerForEvent(eventId);
+      showToast('Berhasil mendaftar ke kegiatan!', 'success');
+    } catch (error) {
+      showToast('Gagal mendaftar ke kegiatan.', 'error');
+    } finally {
+      setLoadingEventId(null);
+    }
+  };
+
   // MEMBER VIEW
   if (currentUser?.role === Role.MEMBER) {
-    const myUpcomingEvents = events.filter(e => 
-      getComputedStatus(e) === EventStatus.UPCOMING && e.attendees.includes(currentUser.id)
+    const myEvents = events.filter(e => 
+      e.attendees.includes(currentUser.id)
     );
     
     const availableEvents = events.filter(e => 
-      getComputedStatus(e) === EventStatus.UPCOMING && !e.attendees.includes(currentUser.id)
+      getComputedStatus(e) === EventStatus.UPCOMING && 
+      !e.attendees.includes(currentUser.id) &&
+      (e.division === Division.GENERAL || e.division === currentUser.division)
     );
 
     return (
@@ -82,12 +89,17 @@ export const Dashboard: React.FC = () => {
               <CheckCircle2 className="mr-2 text-green-600" size={20} />
               Kegiatan Anda (Terdaftar)
             </h2>
-            {myUpcomingEvents.length > 0 ? (
-              myUpcomingEvents.map(event => (
+            {myEvents.length > 0 ? (
+              myEvents.map(event => (
                 <div key={event.id} className="bg-white p-5 rounded-xl border border-green-100 shadow-sm hover:border-green-200 transition-colors">
                    <div className="flex justify-between items-start mb-2">
-                     <span className="text-xs font-semibold px-2 py-1 bg-green-50 text-green-700 rounded-md">Terdaftar</span>
-                     <span className="text-xs text-slate-500">{event.date}</span>
+                     <div className="flex gap-2 flex-wrap">
+                       <span className="text-xs font-semibold px-2 py-1 bg-green-50 text-green-700 rounded-md">Terdaftar</span>
+                       <span className={`text-xs font-semibold px-2 py-1 rounded-md ${event.division === Division.GENERAL ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
+                         Terbuka: {event.division === Division.GENERAL ? 'Semua Divisi' : `Divisi ${event.division}`}
+                       </span>
+                     </div>
+                     <span className="text-xs text-slate-500 whitespace-nowrap ml-2">{event.date}</span>
                    </div>
                    <h3 className="font-bold text-slate-900 mb-1">{event.title}</h3>
                    <div className="flex items-center gap-3 text-sm text-slate-500 mt-2">
@@ -113,16 +125,33 @@ export const Dashboard: React.FC = () => {
               availableEvents.map(event => (
                 <div key={event.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-blue-200 transition-colors">
                    <div className="flex justify-between items-start mb-2">
-                     <span className="text-xs font-semibold px-2 py-1 bg-slate-100 text-slate-600 rounded-md">{event.division}</span>
-                     <span className="text-xs text-slate-500">{event.date}</span>
+                     <div className="flex gap-2 flex-wrap">
+                       {/* Contextual Badge (Terdaftar vs Division) */}
+                       {event.attendees.includes(currentUser.id) ? (
+                         <span className="text-xs font-semibold px-2 py-1 bg-green-50 text-green-700 rounded-md">Terdaftar</span>
+                       ) : null}
+                       
+                       <span className={`text-xs font-semibold px-2 py-1 rounded-md ${event.division === Division.GENERAL ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
+                         Terbuka: {event.division === Division.GENERAL ? 'Semua Divisi' : `Divisi ${event.division}`}
+                       </span>
+                     </div>
+                     <span className="text-xs text-slate-500 whitespace-nowrap ml-2">{event.date}</span>
                    </div>
                    <h3 className="font-bold text-slate-900 mb-1">{event.title}</h3>
                    <p className="text-sm text-slate-600 line-clamp-2 mb-3">{event.description}</p>
                    <button 
-                     onClick={() => registerForEvent(event.id)}
-                     className="w-full py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium rounded-lg text-sm transition-colors"
+                     onClick={() => handleRegisterEvent(event.id)}
+                     disabled={loadingEventId === event.id}
+                     className="w-full py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium rounded-lg text-sm transition-colors flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed"
                    >
-                     Gabung Kegiatan
+                     {loadingEventId === event.id ? (
+                       <>
+                         <Loader2 className="animate-spin mr-2" size={16} />
+                         Memproses...
+                       </>
+                     ) : (
+                       'Gabung Kegiatan'
+                     )}
                    </button>
                 </div>
               ))

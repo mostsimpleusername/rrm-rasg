@@ -215,11 +215,11 @@ CREATE POLICY "event_attendees: authenticated can read"
   TO authenticated
   USING (true);
 
--- Users may register themselves for an event
-CREATE POLICY "event_attendees: users can insert own"
+-- Users may register themselves for an event, Admins may register anyone
+CREATE POLICY "event_attendees: users can insert own or admin"
   ON event_attendees FOR INSERT
   TO authenticated
-  WITH CHECK (user_id = auth.uid());
+  WITH CHECK (user_id = auth.uid() OR is_admin());
 
 -- Users may remove their own attendance, admins may remove anyone's
 CREATE POLICY "event_attendees: users can delete own or admin"

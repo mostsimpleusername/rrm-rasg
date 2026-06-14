@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
+import { useToast } from '../context/ToastContext';
 import { Role, Division, User } from '../types';
-import { CheckCircle2, XCircle, Search, Filter, Eye, X, Calendar, Clock, AlertCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, Search, Filter, Eye, X, Calendar, Clock, AlertCircle, Loader2 } from 'lucide-react';
 
 export const Members: React.FC = () => {
   const { users, events, updateUserStatus, updateUserProfile, currentUser } = useData();
@@ -12,6 +13,9 @@ export const Members: React.FC = () => {
   const [actionUser, setActionUser] = useState<{ user: User, action: 'Nonaktifkan' | 'Tolak' } | null>(null);
   const [profileUpdates, setProfileUpdates] = useState<{ role?: Role, division?: Division } | null>(null);
   const [confirmProfileUpdate, setConfirmProfileUpdate] = useState<boolean>(false);
+  const { showToast } = useToast();
+  const [loadingActionId, setLoadingActionId] = useState<string | null>(null);
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState<boolean>(false);
 
   if (currentUser?.role === Role.MEMBER) {
     return <div className="text-center p-10 text-slate-500">Akses Ditolak. Area khusus admin.</div>;
@@ -249,20 +253,26 @@ export const Members: React.FC = () => {
                 Batal
               </button>
               <button 
+                disabled={loadingActionId === userToApprove.id}
                 onClick={async () => {
+                  setLoadingActionId(userToApprove.id);
                   try {
                     await updateUserProfile(userToApprove.id, { 
                       division: userToApprove.division, 
                       role: userToApprove.role 
                     });
                     await updateUserStatus(userToApprove.id, 'Aktif');
-                    setUserToApprove(null);
+                    showToast(`Akun ${userToApprove.name} berhasil disetujui.`, 'success');
                   } catch (err) {
-                    console.error("Failed to approve", err);
+                    showToast('Gagal menyetujui akun.', 'error');
+                  } finally {
+                    setLoadingActionId(null);
+                    setUserToApprove(null);
                   }
                 }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm"
+                className="px-4 py-2 bg-blue-600 flex items-center text-white rounded-lg hover:bg-blue-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
+                {loadingActionId === userToApprove.id ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
                 Setujui & Simpan
               </button>
             </div>
@@ -403,12 +413,22 @@ export const Members: React.FC = () => {
                 Batal
               </button>
               <button 
+                disabled={loadingActionId === actionUser.user.id}
                 onClick={async () => {
-                  await updateUserStatus(actionUser.user.id, 'Nonaktif');
-                  setActionUser(null);
+                  setLoadingActionId(actionUser.user.id);
+                  try {
+                    await updateUserStatus(actionUser.user.id, 'Nonaktif');
+                    showToast(`Anggota berhasil ${actionUser.action === 'Nonaktifkan' ? 'dinonaktifkan' : 'ditolak'}.`, 'success');
+                  } catch (error) {
+                    showToast(`Gagal memproses aksi.`, 'error');
+                  } finally {
+                    setLoadingActionId(null);
+                    setActionUser(null);
+                  }
                 }}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm"
+                className="px-4 py-2 bg-red-600 flex items-center text-white rounded-lg hover:bg-red-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
+                {loadingActionId === actionUser.user.id ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
                 Ya, {actionUser.action}
               </button>
             </div>
@@ -432,13 +452,23 @@ export const Members: React.FC = () => {
                 Batal
               </button>
               <button 
+                disabled={isUpdatingProfile}
                 onClick={async () => {
-                  await updateUserProfile(selectedUser.id, profileUpdates);
-                  setSelectedUser({ ...selectedUser, ...profileUpdates });
-                  setConfirmProfileUpdate(false);
+                  setIsUpdatingProfile(true);
+                  try {
+                    await updateUserProfile(selectedUser.id, profileUpdates);
+                    setSelectedUser({ ...selectedUser, ...profileUpdates });
+                    showToast('Profil berhasil diperbarui.', 'success');
+                  } catch (error) {
+                    showToast('Gagal memperbarui profil.', 'error');
+                  } finally {
+                    setIsUpdatingProfile(false);
+                    setConfirmProfileUpdate(false);
+                  }
                 }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm"
+                className="px-4 py-2 bg-blue-600 flex items-center text-white rounded-lg hover:bg-blue-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
+                {isUpdatingProfile ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
                 Ya, Simpan
               </button>
             </div>
